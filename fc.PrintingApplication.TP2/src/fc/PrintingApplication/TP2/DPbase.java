@@ -12,6 +12,9 @@ import static org.lwjgl.opengl.GL32.*;
 // --- Buffers utilitaires LWJGL ---
 import org.lwjgl.BufferUtils;
 
+import fc.PrintingApplication.TP2.Main.Render;
+
+import java.awt.font.NumericShaper.Range;
 // --- Java ---
 import java.nio.IntBuffer;
 
@@ -214,7 +217,14 @@ abstract class DPbase {
 
     protected void clearTo(float r) {
         glClearColor(r, 0f, 0f, 0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        //if(Main.renderType == Render.STENCIL)glClear(GL_COLOR_BUFFER_BIT);
+        //if(Main.renderType == Render.BLENDING)glClear(GL_STENCIL_BUFFER_BIT);
+
+        
     }
 
     protected void useMeshProgram(float z, float e, int mode) {
@@ -230,6 +240,9 @@ abstract class DPbase {
         glDrawElements(meshMode, meshIndexCount, GL_UNSIGNED_INT, 0L);
         glBindVertexArray(0);
     }
+
+    public int getFbo() { return fbo; }
+    public int getColorTexture() { return colorTex; }
 
     // ----------------- Shaders communs -----------------
 

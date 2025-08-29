@@ -72,4 +72,5 @@ class DPstencil extends DPbase {
         glDisable(GL_STENCIL_TEST);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
+
 }

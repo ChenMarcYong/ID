@@ -96,7 +96,7 @@ import java.util.stream.Stream;
 	public static float resolution = 0.05f;	// resolution
 	public static float k = 3f;		// augmenter / dimuner la distance entre chaque path
 	public static Object object = Object.YODA;	// object to choose
-	public static Render renderType = Render.STENCIL;	// afficher les chemins ou le depth peeling
+	public static Render renderType = Render.BLENDING;	// afficher les chemins ou le depth peeling
 
 	public static float step = 0.2f;	// pas entre tranche
 
@@ -206,12 +206,13 @@ public static void main(String[] args)
 					}
 					break;
 				case BLENDING:
-					
+					setupGL();
 					break;
 				case STENCIL:
 					setupGL();
 					break;
 				default:
+					
 					break;
 			}
 
@@ -299,7 +300,10 @@ public static void main(String[] args)
 
 		}
 	}	
-
+			/*DepthPeelingGPU dp = new DepthPeelingGPU(width, height, resolution,
+											aabb.getMin().z, aabb.getMax().z);*/
+			/*dp.setMesh(vao, idxArr.length, GL_TRIANGLES);
+			dp.initGL();*/
 
 
 	void setupGL()
@@ -389,33 +393,36 @@ public static void main(String[] args)
 
 
 			int ebo = glGenBuffers(); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-			// convertir ArrayList -> int[]
 			int[] idxArr = new int[idx.size()]; for (int i=0;i<idx.size();i++) idxArr[i]=idx.get(i);
 			glBufferData(GL_ELEMENT_ARRAY_BUFFER, idxArr, GL_STATIC_DRAW);
 			glBindVertexArray(0);
 
-			//2 Instancier et initialiser le peeler
 
-			DepthPeelingGPU dp = new DepthPeelingGPU(width, height, /*sXY=*/resolution,
-											aabb.getMin().z, aabb.getMax().z);
+
+			DPbase dp = new DPblend(width, height, aabb.getMin().z, aabb.getMax().z);
+
+			if(renderType == Render.BLENDING) dp = new DPblend(width, height, aabb.getMin().z, aabb.getMax().z);
+			else if(renderType == Render.STENCIL) dp = new DPstencil(width, height, aabb.getMin().z, aabb.getMax().z);
+
+
+
+
 			dp.setMesh(vao, idxArr.length, GL_TRIANGLES);
 			dp.initGL();
 
 			float zMin = aabb.getMin().z;
 			float zMax = aabb.getMax().z;
-			float zSlice = 0.5f * (zMin + zMax);   // par ex. coupe au milieu
-			dp.renderSlice(zSlice);                 // <-- c’est ici
+			float zSlice = 0.5f * (zMin + zMax);
+			dp.renderSlice(zSlice);     
 			glFinish();   
 
-			// Option : éviter le sRGB pour une sortie brute 8-bit
 			glDisable(GL_FRAMEBUFFER_SRGB);
 
 
 
-			final float step = 0.20f;    // mm par couche (à adapter)
-			final float epsZ = 1e-6f;    // petite marge
+			final float step = 0.20f;    
+			final float epsZ = 1e-6f;   
 
-			// construire le dossier de sortie cohérent avec <file>/<renderType.path>
 			String file = object.path.substring(object.path.lastIndexOf("/") + 1);
 			file = file.substring(0, file.lastIndexOf("."));
 			java.nio.file.Path outDir = java.nio.file.Paths.get("Results", file, renderType.path);
@@ -471,12 +478,11 @@ public static void main(String[] args)
 
 	
 private static BufferedImage readColorTextureRGBA8(int tex, int w, int h) {
-    // Lire la texture directement
+
     glBindTexture(GL_TEXTURE_2D, tex);
     java.nio.ByteBuffer buf = org.lwjgl.BufferUtils.createByteBuffer(w * h * 4);
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, buf);
 
-    // Construire BufferedImage (flip vertical)
     BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
     int stride = w * 4;
     for (int y = 0; y < h; ++y) {
