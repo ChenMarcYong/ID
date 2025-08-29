@@ -40,7 +40,6 @@ import fc.Math.Vec2f;
 import fc.Math.Vec2i;
 import fc.Math.Vec3f;
 import fc.Math.Vec4f;
-import javafx.scene.shape.Mesh;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.*;
