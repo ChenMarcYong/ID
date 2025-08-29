@@ -386,37 +386,57 @@ public static void main(String[] args)
 			dp.setMesh(vao, idxArr.length, GL_TRIANGLES);
 			dp.initGL();
 
-			java.nio.file.Path outDir = java.nio.file.Paths.get("TP2","Results","peeling");
-			java.nio.file.Files.createDirectories(outDir);
+			float zMin = aabb.getMin().z;
+			float zMax = aabb.getMax().z;
+			float zSlice = 0.5f * (zMin + zMax);   // par ex. coupe au milieu
+			dp.renderSlice(zSlice);                 // <-- c’est ici
+			glFinish();   
 
 			// Option : éviter le sRGB pour une sortie brute 8-bit
 			glDisable(GL_FRAMEBUFFER_SRGB);
 
 
+
+			final float step = 0.20f;    // mm par couche (à adapter)
+			final float epsZ = 1e-6f;    // petite marge
+
+			// construire le dossier de sortie cohérent avec <file>/<renderType.path>
 			String file = object.path.substring(object.path.lastIndexOf("/") + 1);
-				file = file.substring(0, file.lastIndexOf("."));
+			file = file.substring(0, file.lastIndexOf("."));
+			java.nio.file.Path outDir = java.nio.file.Paths.get("TP2","Results", file, renderType.path);
+			java.nio.file.Files.createDirectories(outDir);
 
-			BufferedImage img = textureToBufferedImage(dp.getColorTexture(), width, height);
-			ImageIO.write(img, "png", new File( "TP2/Results/" + file +"/" + renderType.path + "/" + String.valueOf(0) + ".png"));
-					
-			// Pour l'écriture PNG (LWJGL STB)
-			/*org.lwjgl.stb.STBImageWrite.stbi_flip_vertically_on_write(true);
-			int slice = 0;
-			for (float z = aabb.getMin().z; z <= aabb.getMax().z + 1e-6f; z += step) {
-				dp.renderSlice(z);
+			// nombre de couches
+			int nSlices = (int)Math.floor((zMax - zMin) / step) + 1;
+			// padding pour noms 0000.png, 0001.png, ...
+			int pad = Integer.toString(Math.max(0, nSlices - 1)).length();
 
-				int tex = dp.getColorTexture();
-				java.nio.ByteBuffer px = org.lwjgl.BufferUtils.createByteBuffer(width*height*4);
-				glBindTexture(GL_TEXTURE_2D, tex);
-				glPixelStorei(GL_PACK_ALIGNMENT, 1);
-				glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
+			for (int k = 0; k < nSlices; ++k) {
+				zSlice = zMin + k * step;
+				if (zSlice > zMax + epsZ) break;
 
-				String name = String.format("slice_%04d.png", slice++);
-				org.lwjgl.stb.STBImageWrite.stbi_write_png(outDir.resolve(name).toString(),
-						width, height, 4, px, width*4);
-				px.clear();
-			}*/
+				// Option : échantillonner au centre de la tranche
+				// zSlice = Math.min(zMax, zSlice + 0.5f * step);
 
+				dp.renderSlice(zSlice);
+
+				glBindFramebuffer(GL_READ_FRAMEBUFFER, dp.getFbo()); // voir remarque ci-dessous
+				glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+				glReadBuffer(GL_COLOR_ATTACHMENT0);
+				glBlitFramebuffer(
+					0, 0, width, height,
+					0, 0, width, height,
+					GL_COLOR_BUFFER_BIT, GL_NEAREST
+				);
+				GLFW.glfwSwapBuffers(win);
+				GLFW.glfwPollEvents();
+
+				glFinish(); // s'assurer que le GPU a terminé avant lecture
+
+				BufferedImage img = readColorTextureRGBA8(dp.getColorTexture(), width, height);
+				String name = String.format("%0" + pad + "d.png", k);
+				ImageIO.write(img, "png", outDir.resolve(name).toFile());
+			}
 		}
 
 		catch (java.io.FileNotFoundException e)
@@ -428,36 +448,32 @@ public static void main(String[] args)
 	    {
 	    	System.out.println("IOException loading file "+object.path+", e=" + e);
 	        e.printStackTrace();
-	    }
-
+	    }	
+	}
 	
-	}
 
+private static BufferedImage readColorTextureRGBA8(int tex, int w, int h) {
+    // Lire la texture directement
+    glBindTexture(GL_TEXTURE_2D, tex);
+    java.nio.ByteBuffer buf = org.lwjgl.BufferUtils.createByteBuffer(w * h * 4);
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, buf);
 
-	static BufferedImage textureToBufferedImage(int tex, int width, int height) {
-		// Lire la texture GPU (RGBA, 8-bit)
-		ByteBuffer buf = BufferUtils.createByteBuffer(width * height * 4);
-		glBindTexture(GL_TEXTURE_2D, tex);
-		glPixelStorei(GL_PACK_ALIGNMENT, 1);
-		glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, buf);
-
-		// Convertir RGBA (GL) -> ARGB (BufferedImage), et retourner l'image verticalement
-		int[] argb = new int[width * height];
-		for (int y = 0; y < height; y++) {
-			int srcRow = (height - 1 - y) * width * 4;   // flip vertical
-			int dstRow = y * width;
-			for (int x = 0; x < width; x++) {
-				int i = srcRow + x * 4;
-				int r = buf.get(i)     & 0xFF;
-				int g = buf.get(i + 1) & 0xFF;
-				int b = buf.get(i + 2) & 0xFF;
-				int a = buf.get(i + 3) & 0xFF;
-				argb[dstRow + x] = (a << 24) | (r << 16) | (g << 8) | b;
-			}
-		}
-		BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-		img.setRGB(0, 0, width, height, argb, 0, width);
-		return img;
-	}
-
+    // Construire BufferedImage (flip vertical)
+    BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+    int stride = w * 4;
+    for (int y = 0; y < h; ++y) {
+        int srcY = (h - 1 - y); // flip
+        int row = srcY * stride;
+        for (int x = 0; x < w; ++x) {
+            int i = row + x * 4;
+            int r = buf.get(i)   & 0xFF;
+            int g = buf.get(i+1) & 0xFF;
+            int b = buf.get(i+2) & 0xFF;
+            int a = buf.get(i+3) & 0xFF;
+            int argb = (a<<24) | (r<<16) | (g<<8) | b;
+            img.setRGB(x, y, argb);
+        }
+    }
+    return img;
+}
 }

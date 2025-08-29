@@ -112,22 +112,29 @@ public class DepthPeelingGPU {
         // ---------------- Pass A: Stencil even-odd under z_s ----------------
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
+        glDisable(GL_BLEND);
         glColorMask(false, false, false, false);
-        glStencilMask(0xFF);
+
         glEnable(GL_STENCIL_TEST);
+        glStencilMask(0xFF);
         glClearStencil(0);
         glClear(GL_STENCIL_BUFFER_BIT);
 
-        // Invert stencil on every passing fragment
-        glStencilOp(GL_KEEP, GL_KEEP, GL_INVERT);
-        glStencilFunc(GL_ALWAYS, 0x1, 0xFF);
-
+        // Comptage winding: faces avant ++, faces arrière --
+        // (le fragment doit être sous la coupe z_s)
         glUseProgram(progMeshDiscardAbove);
         glUniform1f(glGetUniformLocation(progMeshDiscardAbove, "uZSlice"), z_s);
         glUniform1f(glGetUniformLocation(progMeshDiscardAbove, "uEps"), epsZ);
-        glUniform1i(glGetUniformLocation(progMeshDiscardAbove, "uMode"), 0); // 0: count under z_s
+        glUniform1i(glGetUniformLocation(progMeshDiscardAbove, "uMode"), 0); // 0 => z <= z_s+eps
 
-        // Draw mesh
+        // IMPORTANT : ops séparés pour FRONT/BACK
+        glStencilFuncSeparate(GL_FRONT_AND_BACK, GL_ALWAYS, 0, 0xFF);
+        glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_KEEP, GL_INCR_WRAP);
+        glStencilOpSeparate(GL_BACK,  GL_KEEP, GL_KEEP, GL_DECR_WRAP);
+
+        // assure la même convention que tes données (souvent CCW)
+        glFrontFace(GL_CCW);
+
         glBindVertexArray(meshVao);
         drawMesh();
         glBindVertexArray(0);
@@ -139,6 +146,7 @@ public class DepthPeelingGPU {
         glDrawBuffers(drawBuf);
 
         glDisable(GL_STENCIL_TEST);
+        glStencilMask(0x00);
         glColorMask(true, true, true, true);
         glClearColor(zMinWorld - 1.0f, 0f, 0f, 0f); // clear to very low z in R channel
         glClear(GL_COLOR_BUFFER_BIT);
@@ -180,36 +188,43 @@ public class DepthPeelingGPU {
         glBindVertexArray(0);
 
         glDisable(GL_BLEND);
-
+        glStencilMask(0xFF);
         // ---------------- Pass D: Compose using stencil==1 ----------------
         // Attach colorTex as output
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0);
-        drawBuf.clear(); drawBuf.put(GL_COLOR_ATTACHMENT0).flip();
+        drawBuf = BufferUtils.createIntBuffer(1);
+        drawBuf.put(GL_COLOR_ATTACHMENT0).flip();
         glDrawBuffers(drawBuf);
 
-        glClearColor(0f, 0f, 0f, 1f); // black outside
+        glColorMask(true, true, true, true);
+        glClearColor(0f, 0f, 0f, 1f);
         glClear(GL_COLOR_BUFFER_BIT);
 
+        // dessiner uniquement où le winding != 0 (intérieur)
         glEnable(GL_STENCIL_TEST);
-        glStencilFunc(GL_EQUAL, 0x1, 0xFF); // draw only where inside
+        glStencilFunc(GL_NOTEQUAL, 0, 0xFF);
         glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
+        // binder les textures B/C
         glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texZLower);
         glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, texZUpper);
 
+        // lancer le shader de composition
         glUseProgram(progCompose);
         glUniform1i(glGetUniformLocation(progCompose, "uTexZLower"), 0);
         glUniform1i(glGetUniformLocation(progCompose, "uTexZUpper"), 1);
         glUniform1f(glGetUniformLocation(progCompose, "uZSlice"), z_s);
         glUniform1f(glGetUniformLocation(progCompose, "uMaxDist"), maxDistColor);
 
+        // fullscreen triangle
         glBindVertexArray(vaoQuad);
-        glDrawArrays(GL_TRIANGLES, 0, 3); // fullscreen tri
+        glDrawArrays(GL_TRIANGLES, 0, 3);
         glBindVertexArray(0);
 
+        // clean-up
         glDisable(GL_STENCIL_TEST);
 
-        // Unbind FBO (leave colorTex populated)
+        // laisser colorTex rempli, puis débinder le FBO
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
@@ -290,6 +305,8 @@ public class DepthPeelingGPU {
         glDeleteShader(f);
         return p;
     }
+
+    	public int getFbo() { return fbo; }
 
     // --------------------- Shaders ---------------------
 
