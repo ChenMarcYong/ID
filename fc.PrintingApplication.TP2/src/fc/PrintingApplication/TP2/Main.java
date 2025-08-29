@@ -90,13 +90,13 @@ import java.util.stream.Stream;
 	//
 
 
-	public static int width = 2000;		// image width
-	public static int height = 2000;	// image height
+	public static int width = 1500;		// image width
+	public static int height = 1500;	// image height
 	public static float buseDiameter = 0.4f;	// diamètre de la buse
 	public static float resolution = 0.05f;	// resolution
-	public static float k = 3f;		// augmenter / dimuner la distance entre chaque path
-	public static Object object = Object.YODA;	// object to choose
-	public static Render renderType = Render.BLENDING;	// afficher les chemins ou le depth peeling
+	public static float k = 3f;		// augmenter / dimuner le offest
+	public static Object object = Object.GIRAFFE;	// object to choose
+	public static Render renderType = Render.CHEMIN;	// afficher les chemins ou le depth peeling
 
 	public static float step = 0.2f;	// pas entre tranche
 
@@ -122,10 +122,14 @@ import java.util.stream.Stream;
 	{
 		CUBE("3d_models/cube.obj"), 
 		CUBEWITHHOLE("3d_models/Cubewithhole.obj"),
-		CUTEOCTO("3d_models/CuteOcto.obj"),
+		CUTEOCTO("3d_models/CuteOcto.obj"),			// 17
 		GIRAFFE("3d_models/giraffe.obj"), 
 		MOAI("3d_models/moai.obj"), 
-		YODA("3d_models/yoda.obj");
+		YODA("3d_models/yoda.obj"),
+		ESCALIER("3d_models/escalier.obj"),		// tranche50 pour voir la tranche intéressante avec un step de 0.2f
+		TRY("3d_models/try.obj"),
+
+		CHEESE("3d_models/Cheese.obj");
 
 		private final String path;
 
@@ -190,10 +194,7 @@ public static void main(String[] args)
 				aabb.enlarge(new Vec3f(x, y, z));
 	        }
 			aabb.addMargin(new Vec3f(10, 10, 0));
-	        // Enumeration des faces (souvent des triangles, mais peuvent comporter plus de sommets dans certains cas)
-	        int compteur = 0;
-			//setupGL();
-			//Trancher(builder, aabb, (float)(aabb.getMin().z + 0.2), filename, compteur);
+	       int compteur = 0;
 
 
 			switch (renderType) 
@@ -291,19 +292,21 @@ public static void main(String[] args)
 			
 			if(t.listContours.size() > 0)
 			{
-				//System.out.println(t.listContours.size());
 				//BufferedImage img = t.dessinerContoursImage(Main.width, Main.height, 20, Main.width/2, Main.height/2, 0);
 				BufferedImage img = t.dessinerContoursEtOffsetsImage(Main.width, Main.height, Main.resolution, Main.width/2, Main.height/2);
-				try { ImageIO.write(img, "png", new File( "Results/" + file +"/" + renderType.path + "/" + String.valueOf(compteur) + ".png")); }
+				try 
+				{ 
+					java.nio.file.Path outDir = java.nio.file.Paths.get("Results", file, renderType.path);
+					java.nio.file.Files.createDirectories(outDir);
+					String name = String.format("tranche0" + Integer.toString(compteur) + ".png");
+					ImageIO.write(img, "png", outDir.resolve(name).toFile());
+				}
 				catch (Exception e) { e.printStackTrace() ;}
 			}
 
 		}
 	}	
-			/*DepthPeelingGPU dp = new DepthPeelingGPU(width, height, resolution,
-											aabb.getMin().z, aabb.getMax().z);*/
-			/*dp.setMesh(vao, idxArr.length, GL_TRIANGLES);
-			dp.initGL();*/
+
 
 
 	void setupGL()

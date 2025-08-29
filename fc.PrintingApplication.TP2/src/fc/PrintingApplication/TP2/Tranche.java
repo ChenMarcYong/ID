@@ -49,6 +49,13 @@ class Contour {
 
     void determineOrientation()
     {
+
+
+        double area2 = 0;
+        for (int i=0, j=listPoints.size()-1; i<listPoints.size(); j=i++) {
+            Vec2f a = listPoints.get(j), b = listPoints.get(i);
+            area2 += (a.x * b.y - b.x * a.y);
+        }
         int sum = 0;
         for(int i = 0; i < listPoints.size() - 1; i++)      //(x2-x1)*(y2+y1)
         {
@@ -60,14 +67,14 @@ class Contour {
         }
         switch (type) {
             case HOLE:
-                if(sum < 0)
+                if(area2 >= 0)
                 {
                     Collections.reverse(listAretes);
                     //System.out.println("list inversé");
                 }
                 break;
             case ISLAND:
-                if(sum >= 0)
+                if(area2 < 0)
                 {
                     Collections.reverse(listAretes);
                     //System.out.println("list inversé");
@@ -91,7 +98,7 @@ class Contour {
     }
 
 
-    
+
 public float projection(Vec2f start, Vec2f end, Vec2f p)
     {
         
@@ -183,7 +190,7 @@ class Tranche
         float epsilon = (float) 2 / 20;
         
         for(Contour contour : listContours)contour.listPoints = contour.DivideAndConquer(contour.listPoints, epsilon);
-
+        //reverseHole();
         clip();
 
     }
@@ -337,12 +344,29 @@ class Tranche
     }
 
 
+
+    void reverseHole()
+    {
+        for(Contour contour : listContours)
+        {
+            if(contour.type == Type.HOLE)
+            {
+                
+                Collections.reverse(contour.listPoints);
+
+            }
+        }
+    }
+
+
+    
 ArrayList<Path64> clip() {
 
 
 
     ClipperOffset offset = new ClipperOffset();
     for (Contour contour : listContours) {
+        //if (contour.type == Type.HOLE) continue;
         List<Vec2f> positions = contour.listPoints;
         if (positions.size() < 2) continue;
 
@@ -354,6 +378,8 @@ ArrayList<Path64> clip() {
         }
         offset.AddPath(path, JoinType.Miter, EndType.Polygon);
     }
+
+    offset.setMergeGroups(false);
 
     double delta = -Main.k*( Main.buseDiameter / Main.resolution); 
     while (true) {
