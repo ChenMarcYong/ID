@@ -24,7 +24,6 @@ public class Arete implements Comparable<Arete>
         }
     }
 
-
     public boolean Intersect(Vec2f point)
     {
         

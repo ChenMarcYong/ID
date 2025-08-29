@@ -2,6 +2,8 @@
 
 package fc.Math;
 
+import java.util.Objects;
+
 public class Vec2f
 {
 	public float x;
@@ -70,6 +72,11 @@ public class Vec2f
 		double epsilon = 0.000001f; // Définissez l'epsilon   // 0.000001f pour cuteOcto
 		return Math.abs(rhs.x - x) <= epsilon && Math.abs(rhs.y - y) <= epsilon;
 	}
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(x, y);
+    }
 
 	public Vec2f subtract(Vec2f other) {
         return new Vec2f(this.x - other.x, this.y - other.y);

@@ -4,8 +4,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import fc.Math.Vec2f;
 import fc.PrintingApplication.clipper2.core.Path64;
@@ -49,8 +51,6 @@ class Contour {
 
     void determineOrientation()
     {
-
-
         double area2 = 0;
         for (int i=0, j=listPoints.size()-1; i<listPoints.size(); j=i++) {
             Vec2f a = listPoints.get(j), b = listPoints.get(i);
@@ -67,16 +67,17 @@ class Contour {
         }
         switch (type) {
             case HOLE:
-                if(area2 >= 0)
+                if(sum < 0)
                 {
                     Collections.reverse(listAretes);
-                    //System.out.println("list inversé");
+                    Collections.reverse(listPoints);
                 }
                 break;
             case ISLAND:
-                if(area2 < 0)
+                if(sum >= 0)
                 {
                     Collections.reverse(listAretes);
+                    Collections.reverse(listPoints);
                     //System.out.println("list inversé");
                 }
                 break;
@@ -95,6 +96,10 @@ class Contour {
         {
             listPoints.add(listAretes.get(i).First);
         }
+        Set<Vec2f> set = new LinkedHashSet<>(listPoints);
+        listPoints = new ArrayList<>(set);
+
+
     }
 
 
@@ -184,13 +189,34 @@ class Tranche
         findAllContours2();
 		JordanTheorem();
 
-        for(int i = 0; i < listContours.size(); i++)listContours.get(i).determineOrientation();
+        
         for(int i = 0; i < listContours.size(); i++) listContours.get(i).getUniquePoints();
+        for(int i = 0; i < listContours.size(); i++)listContours.get(i).determineOrientation();
+        
         
         float epsilon = (float) 2 / 20;
         
-        for(Contour contour : listContours)contour.listPoints = contour.DivideAndConquer(contour.listPoints, epsilon);
+        for(Contour contour : listContours)
+        {
+            contour.listPoints = contour.DivideAndConquer(contour.listPoints, epsilon);
+
+            listAretes = new ArrayList<>();
+            if (contour.listPoints != null && contour.listPoints.size() >= 2) 
+            {
+                for (int i = 0; i < contour.listPoints.size(); i++) {
+                    Vec2f a = contour.listPoints.get(i);
+                    Vec2f b = contour.listPoints.get((i + 1) % contour.listPoints.size());
+                    Arete arete = new Arete();
+                    arete.First = a;
+                    arete.Second = b;
+                    listAretes.add(arete);
+                }
+            }
+        }
         //reverseHole();
+        
+        
+
         clip();
 
     }
@@ -427,7 +453,7 @@ public BufferedImage dessinerContoursImage(int width, int height, double pxPerUn
             if (nb > listContours.get(i).listAretes.size()) nb = listContours.get(i).listAretes.size();
 
 
-            boolean usePoint = true;
+            boolean usePoint = false;
 
             if(!usePoint)
             {

@@ -95,8 +95,8 @@ import java.util.stream.Stream;
 	public static float buseDiameter = 0.4f;	// diamètre de la buse
 	public static float resolution = 0.05f;	// resolution
 	public static float k = 3f;		// augmenter / dimuner le offest
-	public static Object object = Object.GIRAFFE;	// object to choose
-	public static Render renderType = Render.CHEMIN;	// afficher les chemins ou le depth peeling
+	public static Object object = Object.CHEESE;	// object to choose
+	public static Render renderType = Render.BLENDING;	// afficher les chemins ou le depth peeling
 
 	public static float step = 0.2f;	// pas entre tranche
 
