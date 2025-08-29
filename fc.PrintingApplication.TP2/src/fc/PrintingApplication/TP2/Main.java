@@ -96,8 +96,8 @@ import java.util.stream.Stream;
 	public static float buseDiameter = 0.4f;	// diamètre de la buse
 	public static float resolution = 0.05f;	// resolution
 	public static float k = 3f;		// augmenter / dimuner la distance entre chaque path
-	public static Object object = Object.GIRAFFE;	// object to choose
-	public static Render renderType = Render.BLENDING;	// afficher les chemins ou le depth peeling
+	public static Object object = Object.YODA;	// object to choose
+	public static Render renderType = Render.STENCIL;	// afficher les chemins ou le depth peeling
 
 	public static float step = 0.2f;	// pas entre tranche
 
@@ -121,12 +121,12 @@ import java.util.stream.Stream;
 
 	public enum Object
 	{
-		CUBE("TP2/3d_models/cube.obj"), 
-		CUBEWITHHOLE("TP2/3d_models/Cubewithhole.obj"),
-		CUTEOCTO("TP2/3d_models/CuteOcto.obj"),
-		GIRAFFE("TP2/3d_models/giraffe.obj"), 
-		MOAI("TP2/3d_models/moai.obj"), 
-		YODA("TP2/3d_models/yoda.obj");
+		CUBE("3d_models/cube.obj"), 
+		CUBEWITHHOLE("3d_models/Cubewithhole.obj"),
+		CUTEOCTO("3d_models/CuteOcto.obj"),
+		GIRAFFE("3d_models/giraffe.obj"), 
+		MOAI("3d_models/moai.obj"), 
+		YODA("3d_models/yoda.obj");
 
 		private final String path;
 
@@ -146,14 +146,14 @@ public static void main(String[] args)
 	{
 		Main main = new Main();
 		
-		File f = new File("TP2/Results");
+		File f = new File("Results");
 		if (!f.exists()) f.mkdir();
 		
 		String file = object.path.substring(object.path.lastIndexOf("/") + 1);
 		file = file.substring(0, file.lastIndexOf("."));
 
 
-		File baseDir = new File("TP2/Results/" + file);
+		File baseDir = new File("Results/" + file);
 		if (!baseDir.exists()) baseDir.mkdirs(); 
 
 		File contourDir = new File(baseDir, renderType.path);
@@ -207,9 +207,10 @@ public static void main(String[] args)
 					}
 					break;
 				case BLENDING:
-					setupGL();
+					
 					break;
 				case STENCIL:
+					setupGL();
 					break;
 				default:
 					break;
@@ -293,7 +294,7 @@ public static void main(String[] args)
 				//System.out.println(t.listContours.size());
 				//BufferedImage img = t.dessinerContoursImage(Main.width, Main.height, 20, Main.width/2, Main.height/2, 0);
 				BufferedImage img = t.dessinerContoursEtOffsetsImage(Main.width, Main.height, Main.resolution, Main.width/2, Main.height/2);
-				try { ImageIO.write(img, "png", new File( "TP2/Results/" + file +"/" + renderType.path + "/" + String.valueOf(compteur) + ".png")); }
+				try { ImageIO.write(img, "png", new File( "Results/" + file +"/" + renderType.path + "/" + String.valueOf(compteur) + ".png")); }
 				catch (Exception e) { e.printStackTrace() ;}
 			}
 
@@ -305,6 +306,12 @@ public static void main(String[] args)
 	void setupGL()
 	{
 		GLFW.glfwInit();
+
+		GLFW.glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+		GLFW.glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+		GLFW.glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE);
+		GLFW.glfwWindowHint(GLFW_SAMPLES, 0);
+
 		long win = GLFW.glfwCreateWindow(width, height, "Peeling", 0, 0);
 		GLFW.glfwMakeContextCurrent(win);
 		GL.createCapabilities();
@@ -363,6 +370,15 @@ public static void main(String[] args)
 					running += 3;
 				}
 			}
+
+			float minX=1e9f,maxX=-1e9f,minY=1e9f,maxY=-1e9f;
+			for (int i=0;i<pos.size(); i+=3) {
+				float X=pos.get(i), Y=pos.get(i+1);
+				if(X<minX)minX=X; if(X>maxX)maxX=X;
+				if(Y<minY)minY=Y; if(Y>maxY)maxY=Y;
+			}
+			System.out.println("NDC X=["+minX+","+maxX+"], Y=["+minY+","+maxY+"]");
+
 			int vao = glGenVertexArrays(); glBindVertexArray(vao);
 			int vbo = glGenBuffers(); glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
@@ -403,7 +419,7 @@ public static void main(String[] args)
 			// construire le dossier de sortie cohérent avec <file>/<renderType.path>
 			String file = object.path.substring(object.path.lastIndexOf("/") + 1);
 			file = file.substring(0, file.lastIndexOf("."));
-			java.nio.file.Path outDir = java.nio.file.Paths.get("TP2","Results", file, renderType.path);
+			java.nio.file.Path outDir = java.nio.file.Paths.get("Results", file, renderType.path);
 			java.nio.file.Files.createDirectories(outDir);
 
 			// nombre de couches
@@ -434,7 +450,7 @@ public static void main(String[] args)
 				glFinish(); // s'assurer que le GPU a terminé avant lecture
 
 				BufferedImage img = readColorTextureRGBA8(dp.getColorTexture(), width, height);
-				String name = String.format("%0" + pad + "d.png", k);
+				String name = String.format("tranche%0" + pad + "d.png", k);
 				ImageIO.write(img, "png", outDir.resolve(name).toFile());
 			}
 		}
@@ -452,6 +468,9 @@ public static void main(String[] args)
 	}
 	
 
+
+
+	
 private static BufferedImage readColorTextureRGBA8(int tex, int w, int h) {
     // Lire la texture directement
     glBindTexture(GL_TEXTURE_2D, tex);
