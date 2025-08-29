@@ -380,7 +380,7 @@ public static void main(String[] args)
 				if(X<minX)minX=X; if(X>maxX)maxX=X;
 				if(Y<minY)minY=Y; if(Y>maxY)maxY=Y;
 			}
-			System.out.println("NDC X=["+minX+","+maxX+"], Y=["+minY+","+maxY+"]");
+			// System.out.println("NDC X=["+minX+","+maxX+"], Y=["+minY+","+maxY+"]");
 
 			int vao = glGenVertexArrays(); glBindVertexArray(vao);
 			int vbo = glGenBuffers(); glBindBuffer(GL_ARRAY_BUFFER, vbo);
