@@ -193,22 +193,22 @@ public void remplit(Graphics2D g2d)
     float ymax = aretes.get(aretes.size() - 1).Second.y;
 
 
-    for(int y = (int)(ymin * 20); y < (int)(int)(ymax * 20); y++)
+    for(int y = (int)(ymin / Main.resolution); y < (int)(int)(ymax / Main.resolution); y++)
     {
         ArrayList<Arete> intersectlistArete = new ArrayList<>();
         ArrayList<Intersection> intersections = new ArrayList<>();
 
         for(int i = 0; i < aretes.size(); i++)
         {
-            if(aretes.get(i).First.y * 20 > y) break;
+            if(aretes.get(i).First.y / Main.resolution > y) break;
             
-            if(aretes.get(i).Second.y != aretes.get(i).First.y && aretes.get(i).Second.y * 20 > y) intersectlistArete.add(aretes.get(i));
+            if(aretes.get(i).Second.y != aretes.get(i).First.y && aretes.get(i).Second.y / Main.resolution > y) intersectlistArete.add(aretes.get(i));
         }
 
         for(int i = 0; i < intersectlistArete.size(); i++)
         {
             float pente = (intersectlistArete.get(i).Second.x - intersectlistArete.get(i).First.x) / (intersectlistArete.get(i).Second.y - intersectlistArete.get(i).First.y);
-            intersections.add(new Intersection(y, (int) (intersectlistArete.get(i).First.x * 20 + pente * (y - intersectlistArete.get(i).First.y * 20)),intersectlistArete.get(i)));
+            intersections.add(new Intersection(y, (int) (intersectlistArete.get(i).First.x / Main.resolution + pente * (y - intersectlistArete.get(i).First.y / Main.resolution)),intersectlistArete.get(i)));
         }
         intersections.sort(Comparator.comparing(a -> a.xIntersect));
 
@@ -235,7 +235,7 @@ class Tranche
     {
         listAretes = l;
 
-        findAllContours2();
+        findAllContours3();
 		JordanTheorem();
 
         
@@ -370,6 +370,93 @@ class Tranche
             listContours.add(new Contour(chain));
         }
     }
+
+
+
+void findAllContours3() {
+    listContours.clear();
+    if (listAretes == null || listAretes.isEmpty()) return;
+    class Key {
+        float x, y;
+        Key(Vec2f v) {
+            this.x = Math.round(v.x / Main.resolution);
+            this.y = Math.round(v.y / Main.resolution);
+        }
+        @Override public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof Key)) return false;
+            Key k = (Key) o; return x == k.x && y == k.y;
+        }
+        @Override public int hashCode() { return java.util.Objects.hash(x, y); }
+    }
+
+    Map<Key, ArrayList<Integer>> adj = new HashMap<>();
+    boolean[] used = new boolean[listAretes.size()];
+
+    for (int i = 0; i < listAretes.size(); i++) {
+        Arete e = listAretes.get(i);
+        if (e.First.equals(e.Second)) { used[i] = true; continue; }
+
+        Key kA = new Key(e.First);
+        Key kB = new Key(e.Second);
+
+        adj.computeIfAbsent(kA, key -> new ArrayList<>()).add(i); 
+        adj.computeIfAbsent(kB, key -> new ArrayList<>()).add(i);
+    }
+
+    for (int i = 0; i < listAretes.size(); i++) {
+        if (used[i]) continue;
+
+        Arete e0 = listAretes.get(i);
+        ArrayList<Arete> chain = new ArrayList<>();
+        used[i] = true;
+
+        Vec2f start = e0.First;
+        Vec2f cur   = e0.Second;
+        chain.add(new Arete(e0.First, e0.Second));
+
+        Key startK = new Key(start);
+        Key curK   = new Key(cur);
+
+        boolean closed = false;
+
+        while (true) {
+            ArrayList<Integer> bucket = adj.get(curK);
+            if (bucket == null) break;
+
+            int nextId = -1;
+            for (int id : bucket) {
+                if (!used[id]) { nextId = id; break; }
+            }
+            if (nextId == -1) break;
+
+            Arete en = listAretes.get(nextId);
+            used[nextId] = true;
+
+            if (new Key(en.First).equals(curK)) {
+                chain.add(new Arete(en.First, en.Second));
+                cur = en.Second;
+            } else if (new Key(en.Second).equals(curK)) {
+                chain.add(new Arete(en.Second, en.First));
+                cur = en.First;
+            } else {
+                float d1 = en.First.distanceSquared(cur);
+                float d2 = en.Second.distanceSquared(cur);
+                if (d1 <= d2) { chain.add(new Arete(en.First, en.Second)); cur = en.Second; }
+                else          { chain.add(new Arete(en.Second, en.First)); cur = en.First; }
+            }
+
+            curK = new Key(cur);
+            if (curK.equals(startK)) { closed = true; break; }
+        }
+
+        if (closed && chain.size() >= 3) {
+            listContours.add(new Contour(chain));
+        }
+    }
+}
+
+
 
 
 
@@ -508,12 +595,10 @@ ArrayList<Path64> clip2() {
 
 ArrayList<Path64> clip3() {
 
-    // Réinit sorties
     listPath = new ArrayList<>();
     listPerimetre.clear();
-    perimetre = null; // laissé pour compatibilité si tu l'affiches ailleurs
+    perimetre = null;
 
-    // 1) Construire subject = toutes les boucles (îles + trous)
     Paths64 subject = new Paths64();
     for (Contour contour : listContours) {
         List<Vec2f> pts = contour.listPoints;
@@ -526,10 +611,9 @@ ArrayList<Path64> clip3() {
             path.add(new Point64(x, y));
         }
 
-        // Orientations pour Clipper : îles = positive, trous = négative
-        boolean pos = Clipper.IsPositive(path);
+        /*boolean pos = Clipper.IsPositive(path);
         if (contour.type == Type.ISLAND && !pos) Clipper.ReversePath(path);
-        if (contour.type == Type.HOLE   &&  pos) Clipper.ReversePath(path);
+        if (contour.type == Type.HOLE   &&  pos) Clipper.ReversePath(path);*/
 
         subject.add(path);
     }
@@ -537,15 +621,13 @@ ArrayList<Path64> clip3() {
     if (subject.isEmpty()) return listPath;
 
     // (optionnel) mémoriser la plus grande île originale (héritage d'affichage)
-    long bestArea = Long.MIN_VALUE;
+    /*long bestArea = Long.MIN_VALUE;
     for (Path64 p : subject) {
         if (Clipper.IsPositive(p)) {
             long a = Math.abs(Math.round(Clipper.Area(p)));
             if (a > bestArea) { bestArea = a; perimetre = p; }
         }
-    }
-
-    // 2) 1er inset (épaisseur buse) -> périmètre = subject - inset1
+    }*/
     double step = -Main.k * (Main.buseDiameter / Main.resolution);
     if (step >= 0) step = -Math.abs(step);
 
@@ -556,17 +638,17 @@ ArrayList<Path64> clip3() {
         co.Execute(step, inset1);
     }
 
-    // Périmètre = 1er anneau de matière
-    if (!inset1.isEmpty()) {
+    if (!inset1.isEmpty()) 
+    {
         Paths64 ring0 = Clipper.Difference(subject, inset1, FillRule.NonZero);
         listPerimetre.addAll(ring0);
-    } else {
-        // Si pas d'espace pour un inset, on considère les contours originaux comme périmètre
+    } 
+    else 
+    {
         listPerimetre.addAll(subject);
-        return listPath; // pas de coques possibles
+        return listPath; 
     }
 
-    // 3) Coques successives : anneaux internes
     Paths64 current = inset1;
     while (true) {
         Paths64 next = new Paths64();
@@ -686,22 +768,22 @@ public BufferedImage dessinerRempit(int width, int height, double pxPerUnit, int
 
         if (Main.fill)
         {
-            for(int y = (int)(ymin * 20); y < (int)(int)(ymax * 20); y++)
+            for(int y = (int)(ymin / Main.resolution); y < (int)(int)(ymax / Main.resolution); y++)
             {
                 ArrayList<Arete> intersectlistArete = new ArrayList<>();
                 ArrayList<Intersection> intersections = new ArrayList<>();
 
                 for(int i = 0; i < listAretes.size(); i++)
                 {
-                    if(listAretes.get(i).First.y * 20 > y) break;
+                    if(listAretes.get(i).First.y / Main.resolution > y) break;
                     
-                    if(listAretes.get(i).Second.y != listAretes.get(i).First.y && listAretes.get(i).Second.y * 20 > y) intersectlistArete.add(listAretes.get(i));
+                    if(listAretes.get(i).Second.y != listAretes.get(i).First.y && listAretes.get(i).Second.y / Main.resolution > y) intersectlistArete.add(listAretes.get(i));
                 }
 
                 for(int i = 0; i < intersectlistArete.size(); i++)
                 {
                     float pente = (intersectlistArete.get(i).Second.x - intersectlistArete.get(i).First.x) / (intersectlistArete.get(i).Second.y - intersectlistArete.get(i).First.y);
-                    intersections.add(new Intersection(y, (int) (intersectlistArete.get(i).First.x * 20 + pente * (y - intersectlistArete.get(i).First.y * 20)),intersectlistArete.get(i)));
+                    intersections.add(new Intersection(y, (int) (intersectlistArete.get(i).First.x / Main.resolution + pente * (y - intersectlistArete.get(i).First.y / Main.resolution)),intersectlistArete.get(i)));
                 }
                 intersections.sort(Comparator.comparing(a -> a.xIntersect));
 
