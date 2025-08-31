@@ -244,7 +244,7 @@ class Tranche
         
         
         float epsilon = (float) 2 / 20;
-        
+        listAretes.clear();
         for(Contour contour : listContours)
         {
             // System.out.println("---------------");
@@ -252,6 +252,7 @@ class Tranche
 
             contour.listPoints = contour.DivideAndConquer(contour.listPoints, epsilon);
             contour.recreateAretes();
+            listAretes.addAll(contour.listAretes);
             // System.out.println(contour.listAretes.size());
         }
 
@@ -672,61 +673,15 @@ public BufferedImage dessinerRempit(int width, int height, double pxPerUnit, int
         g2d.translate(cx, cy);
         
         g2d.setColor(Color.WHITE);
-        
-        //listAretes = new ArrayList<>();
-        // for(Contour contour : listContours) listAretes.addAll(contour.listAretes);
 
         if(listAretes.size() < 2) return img;
         listAretes.sort(Comparator.comparing(a -> a.First.y));	
-        float ymin = listAretes.get(0).First.y;
-        float ymax = listAretes.get(listAretes.size() - 1).Second.y;
 
         if (Main.fill)
         {
-            for(int y = (int)(ymin / Main.resolution); y < (int)(int)(ymax / Main.resolution); y++)
-            {
-                ArrayList<Arete> intersectlistArete = new ArrayList<>();
-                ArrayList<Intersection> intersections = new ArrayList<>();
-
-                for(int i = 0; i < listAretes.size(); i++)
-                {
-                    if(listAretes.get(i).First.y / Main.resolution > y) break;
-                    
-                    if(listAretes.get(i).Second.y != listAretes.get(i).First.y && listAretes.get(i).Second.y / Main.resolution > y) intersectlistArete.add(listAretes.get(i));
-                }
-
-                for(int i = 0; i < intersectlistArete.size(); i++)
-                {
-                    float pente = (intersectlistArete.get(i).Second.x - intersectlistArete.get(i).First.x) / (intersectlistArete.get(i).Second.y - intersectlistArete.get(i).First.y);
-                    intersections.add(new Intersection(y, (int) (intersectlistArete.get(i).First.x / Main.resolution + pente * (y - intersectlistArete.get(i).First.y / Main.resolution)),intersectlistArete.get(i)));
-                }
-                intersections.sort(Comparator.comparing(a -> a.xIntersect));
-
-                for (int i = 0; i < intersections.size(); i +=2)
-                {
-                    if(i + 1 >= intersections.size()) break;
-                    g2d.drawLine((int)(intersections.get(i).xIntersect), y, (int)(intersections.get(i + 1).xIntersect), y);
-                } 
-
-            }
+            fillWithAretes(g2d);
         }
         g2d.setColor(Color.RED);
-
-        /*if (perimetre.size() >= 2)
-        {
-        for (int i = 0; i < perimetre.size(); i++) {
-                Point64 a = perimetre.get(i);
-                Point64 b = perimetre.get((i + 1) % perimetre.size());
-
-                int x1 = (int)Math.round((a.x - cx));
-                int y1 = (int)Math.round((a.y - cy));
-                int x2 = (int)Math.round((b.x - cx));
-                int y2 = (int)Math.round((b.y - cy));
-
-                g2d.drawLine(x1, y1, x2, y2);
-            }
-        }*/
-
 
         for(Path64 per : listPerimetre)
         {
@@ -767,13 +722,6 @@ public BufferedImage dessinerRempit(int width, int height, double pxPerUnit, int
                     g2d.drawLine(x1, y1, x2, y2);
                 }
             }
-
-        /*listContours.sort(Comparator.comparing(contour -> contour.type));
-
-        for(Contour contour : listContours)
-        {
-            contour.remplit(g2d);
-        }*/
 
 
         g2d.translate(-cx, -cy);
@@ -845,6 +793,56 @@ public BufferedImage dessinerContoursEtOffsetsImage(
     g2d.translate(-cx, -cy);
     g2d.dispose();
     return img;
+}
+
+
+
+private void fillWithAretes(Graphics2D g2d) {
+    if (listAretes == null || listAretes.size() < 2) return;
+
+    class Edge {
+        int x0, y0, x1, y1;
+        float invPente;
+    }
+
+    ArrayList<Edge> edges = new ArrayList<>(listAretes.size());
+    int yMin = Integer.MAX_VALUE, yMax = Integer.MIN_VALUE;
+
+    for (Arete a : listAretes) {
+        int xA = (int)Math.round(a.First.x  / Main.resolution);
+        int yA = (int)Math.round(a.First.y  / Main.resolution);
+        int xB = (int)Math.round(a.Second.x / Main.resolution);
+        int yB = (int)Math.round(a.Second.y / Main.resolution);
+
+        if (yA == yB) continue;
+
+        Edge e = new Edge();
+        if (yA < yB) { e.x0 = xA; e.y0 = yA; e.x1 = xB; e.y1 = yB; }
+        else          { e.x0 = xB; e.y0 = yB; e.x1 = xA; e.y1 = yA; }
+
+        e.invPente = (float)(e.x1 - e.x0) / (float)(e.y1 - e.y0);
+
+        yMin = Math.min(yMin, e.y0);
+        yMax = Math.max(yMax, e.y1);
+        edges.add(e);
+    }
+    if (edges.isEmpty()) return;
+    for (int y = yMin; y < yMax; y++) {
+        ArrayList<Integer> xs = new ArrayList<>();
+
+        for (Edge e : edges) {
+            if (y >= e.y0 && y < e.y1) {
+                float x = e.x0 + (y - e.y0) * e.invPente;
+                xs.add(Math.round(x));
+            }
+        }
+        if (xs.size() < 2) continue;
+        Collections.sort(xs);
+
+        for (int i = 0; i + 1 < xs.size(); i += 2) {
+            g2d.drawLine(xs.get(i), y, xs.get(i + 1), y);
+        }
+    }
 }
 
 
