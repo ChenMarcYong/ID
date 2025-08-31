@@ -23,7 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-import fc.PrintingApplication.clipper2.core.*;        // Path64, Paths64, Point64, ClipType, FillRule, PathType
+import fc.PrintingApplication.clipper2.core.*;
 
 enum Type
 {
@@ -149,18 +149,17 @@ public ArrayList<Vec2f> DivideAndConquer(List<Vec2f> pts, float epsilon) {
         }
     }
 
-    // si trop loin -> on coupe et on applique récursivement
     if (dmax2 > eps2) {
         List<Vec2f> left  = DivideAndConquer(pts.subList(0, indexMax + 1), epsilon);
         List<Vec2f> right = DivideAndConquer(pts.subList(indexMax, end + 1), epsilon);
 
-        // fusion sans dupliquer le point pivot
         ArrayList<Vec2f> out = new ArrayList<>(left.size() + right.size() - 1);
         out.addAll(left);
         out.addAll(right.subList(1, right.size()));
         return out;
-    } else {
-        // sinon on garde seulement les extrémités
+    } 
+    else 
+    {
         ArrayList<Vec2f> out = new ArrayList<>(2);
         out.add(pts.get(start));
         out.add(pts.get(end));
@@ -285,14 +284,14 @@ class Tranche
 
                     Arete lastArete = Aretes.get(Aretes.size() - 1);
 
-                    if(lastArete.Second.equals(areteTested.First) || lastArete.First.equals(areteTested.Second))     //ok
+                    if(lastArete.Second.equals(areteTested.First) || lastArete.First.equals(areteTested.Second))
                     {
                         Aretes.add(areteTested);
                         ToRemove.add(areteTested);
                         add = true;
                     }
 
-                    else if(lastArete.First.equals(areteTested.First) || lastArete.Second.equals(areteTested.Second))   // reverse
+                    else if(lastArete.First.equals(areteTested.First) || lastArete.Second.equals(areteTested.Second))
                     {
                         Aretes.add(new Arete(areteTested.Second, areteTested.First));
                         ToRemove.add(areteTested);
@@ -467,7 +466,6 @@ ArrayList<Path64> clip2() {
 
     ClipperOffset offset = new ClipperOffset();
 
-    // 1) Construire les contours vectorisés (perimetre = premier path)
     for (Contour contour : listContours) {
         List<Vec2f> positions = contour.listPoints;
         if (positions.size() < 2) continue;
@@ -479,7 +477,6 @@ ArrayList<Path64> clip2() {
             path.add(new Point64(x, y));
         }
 
-        // garder le premier contour comme "périmètre principal"
         if (perimetre == null) {
             perimetre = path;
         }
@@ -489,7 +486,6 @@ ArrayList<Path64> clip2() {
 
     offset.setMergeGroups(false);
 
-    // 2) Génération des coques (delta négatif = contraction vers l’intérieur)
     double delta = -Main.k * (Main.buseDiameter / Main.resolution);
 
     while (true) {
@@ -497,15 +493,13 @@ ArrayList<Path64> clip2() {
         offset.Execute(delta, solution);
         if (solution.isEmpty()) break;
 
-        // Ajouter toutes les coques trouvées à listPath
         listPath.addAll(solution);
 
-        // Préparer offset pour la coque suivante
         offset.Clear();
         offset.AddPaths(solution, JoinType.Miter, EndType.Polygon);
     }
 
-    return listPath; // ne contient que les coques, pas le périmètre
+    return listPath;
 }
 
 
@@ -536,14 +530,6 @@ ArrayList<Path64> clip3() {
 
     if (subject.isEmpty()) return listPath;
 
-    // (optionnel) mémoriser la plus grande île originale (héritage d'affichage)
-    /*long bestArea = Long.MIN_VALUE;
-    for (Path64 p : subject) {
-        if (Clipper.IsPositive(p)) {
-            long a = Math.abs(Math.round(Clipper.Area(p)));
-            if (a > bestArea) { bestArea = a; perimetre = p; }
-        }
-    }*/
     double step = -Main.k * (Main.buseDiameter / Main.resolution);
     if (step >= 0) step = -Math.abs(step);
 
@@ -579,34 +565,30 @@ ArrayList<Path64> clip3() {
         current = next;
     }
 
-    return listPath; // coques ; le 1er anneau (périmètre) est dans listPerimetre
+    return listPath;
 }
 
 
 public BufferedImage dessinerContoursImage(int width, int height, double pxPerUnit, int cx, int cy, int nb) {
         BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = img.createGraphics();
-        // fond blanc
         g2d.setColor(Color.BLACK);
         g2d.fillRect(0, 0, width, height);
 
-        // rendu lisse et épaisseur
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2d.setStroke(new BasicStroke(2f));
 
-        // palette de base (10 couleurs)
         Color[] base = new Color[] {
             Color.RED, Color.GREEN, Color.BLUE, Color.MAGENTA, Color.ORANGE,
             Color.CYAN, Color.PINK, Color.YELLOW, new Color(128, 0, 128), new Color(0, 128, 128)
         };
 
-        // translation du repère
         g2d.translate(cx, cy);
         
         
         
 
-        for(int i = 0; i < listContours.size(); i++)        // listContours.size()
+        for(int i = 0; i < listContours.size(); i++) 
         {
             if(listContours.get(i).type == Type.HOLE) g2d.setColor(Color.RED);
             if(listContours.get(i).type == Type.ISLAND) g2d.setColor(Color.GREEN);
@@ -662,14 +644,13 @@ public BufferedImage dessinerContoursImage(int width, int height, double pxPerUn
 public BufferedImage dessinerRempit(int width, int height, double pxPerUnit, int cx, int cy) {
         BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = img.createGraphics();
-        // fond blanc
+
         g2d.setColor(Color.BLACK);
         g2d.fillRect(0, 0, width, height);
 
-        // rendu lisse et épaisseur
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2d.setStroke(new BasicStroke(2f));
-        // translation du repère
+
         g2d.translate(cx, cy);
         
         g2d.setColor(Color.WHITE);
@@ -741,7 +722,7 @@ public BufferedImage dessinerContoursEtOffsetsImage(
     g2d.setColor(Color.BLACK);
     g2d.fillRect(0, 0, width, height);
 
-    // rendu lisse + épaisseur
+
     g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
     g2d.setStroke(new BasicStroke(2f));
 

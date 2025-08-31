@@ -26,8 +26,8 @@ class DPblend extends DPbase {
             "out vec4 oColor;\n" +
             "void main(){\n" +
             "  vec2 uv = gl_FragCoord.xy / vec2(textureSize(uTexZLower,0));\n" +
-            "  float c  = texture(uTexCount, uv).r;              // nombre d'intersections\n" +
-            "  int parity = int(floor(c + 0.5)) & 1;             // parité robuste (arrondis)\n" +
+            "  float c  = texture(uTexCount, uv).r;\n" +
+            "  int parity = int(floor(c + 0.5)) & 1;\n" +
             "  if (parity == 0) { oColor = vec4(0,0,0,1); return; }\n" +
             "  float zL = texture(uTexZLower, uv).r;\n" +
             "  float zU = texture(uTexZUpper, uv).r;\n" +

@@ -96,8 +96,8 @@ import java.util.stream.Stream;
 	public static int height = 1500;	// image height
 	public static float buseDiameter = 0.4f;	// diamètre de la buse
 	public static float resolution = 0.05f;	// resolution
-	public static float k = 3f;		// augmenter / dimuner le offest	
-	public static Object object = Object.CHEESE;	// object to choose
+	public static float k = 1f;		// augmenter / dimuner le offset,  3f pour giraffe, cheese, moai	2f pour CuteOcto,  1f pour CubeWithHole, pluto
+	public static Object object = Object.PLUTO;	// object to choose
 	public static Render renderType = Render.CHEMIN;	// afficher les chemins ou le depth peeling
 	public static boolean fill = true;
 	public static float step = 0.2f;	// pas entre tranche
@@ -368,11 +368,8 @@ public static void main(String[] args)
 					float x1w = builder.faceVerticeList.get(i1).v.x, y1w = builder.faceVerticeList.get(i1).v.y, z1w = builder.faceVerticeList.get(i1).v.z;
 					float x2w = builder.faceVerticeList.get(i2).v.x, y2w = builder.faceVerticeList.get(i2).v.y, z2w = builder.faceVerticeList.get(i2).v.z;
 
-					// v0
 					pos.add((float)toNdcX.applyAsDouble(x0w)); pos.add((float)toNdcY.applyAsDouble(y0w)); pos.add(z0w);
-					// v1
 					pos.add((float)toNdcX.applyAsDouble(x1w)); pos.add((float)toNdcY.applyAsDouble(y1w)); pos.add(z1w);
-					// v2
 					pos.add((float)toNdcX.applyAsDouble(x2w)); pos.add((float)toNdcY.applyAsDouble(y2w)); pos.add(z2w);
 
 					idx.add(running+0); idx.add(running+1); idx.add(running+2);
@@ -486,7 +483,7 @@ private static BufferedImage readColorTextureRGBA8(int tex, int w, int h) {
     BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
     int stride = w * 4;
     for (int y = 0; y < h; ++y) {
-        int srcY = (h - 1 - y); // flip
+        int srcY = (h - 1 - y);
         int row = srcY * stride;
         for (int x = 0; x < w; ++x) {
             int i = row + x * 4;

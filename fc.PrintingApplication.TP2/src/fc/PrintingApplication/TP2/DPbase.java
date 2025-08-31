@@ -235,10 +235,10 @@ abstract class DPbase {
         "layout(location=0) out vec4 oColor;\n" +
         "void main(){\n" +
         "  float z = vPos.z;\n" +
-        "  if (uMode==0) { if (z > uZSlice + uEps) discard; oColor = vec4(0); }        // stencil path\n" +
-        "  else if (uMode==1){ if (z < uZSlice - uEps) oColor = vec4(z,0,0,1); else discard; } // ZLower\n" +
-        "  else if (uMode==2){ if (z > uZSlice + uEps) oColor = vec4(z,0,0,1); else discard; } // ZUpper\n" +
-        "  else if (uMode==3){ if (z <= uZSlice + uEps) oColor = vec4(1.0,0,0,1); else discard; } // BLEND count\n" +
+        "  if (uMode==0) { if (z > uZSlice + uEps) discard; oColor = vec4(0); }\n" +
+        "  else if (uMode==1){ if (z < uZSlice - uEps) oColor = vec4(z,0,0,1); else discard; }\n" +
+        "  else if (uMode==2){ if (z > uZSlice + uEps) oColor = vec4(z,0,0,1); else discard; }\n" +
+        "  else if (uMode==3){ if (z <= uZSlice + uEps) oColor = vec4(1.0,0,0,1); else discard; }\n" +
         "}\n";
 
     protected static final String VS_QUAD =
