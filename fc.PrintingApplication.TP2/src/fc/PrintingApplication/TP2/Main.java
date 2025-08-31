@@ -343,11 +343,10 @@ public static void main(String[] args)
 			}
 			aabb.addMargin(new Vec3f(10, 10, 0));
 
-			//	1) Construire le VAO
-			float Wmm = width  * resolution;          // largeur monde couverte par l'image
-			float Hmm = height * resolution;          // hauteur monde couverte
-			float x0  = aabb.getCenter().x - Wmm*0.5f; // bord gauche du domaine
-			float y0  = aabb.getCenter().y - Hmm*0.5f; // bord bas du domaine
+			float Wmm = width  * resolution;         
+			float Hmm = height * resolution;   
+			float x0  = aabb.getCenter().x - Wmm*0.5f;
+			float y0  = aabb.getCenter().y - Hmm*0.5f;
 
 			java.util.function.DoubleUnaryOperator toNdcX = x -> ((x - x0)/Wmm)*2.0 - 1.0;
 			java.util.function.DoubleUnaryOperator toNdcY = y -> ((y - y0)/Hmm)*2.0 - 1.0;
@@ -388,7 +387,6 @@ public static void main(String[] args)
 				if(X<minX)minX=X; if(X>maxX)maxX=X;
 				if(Y<minY)minY=Y; if(Y>maxY)maxY=Y;
 			}
-			// System.out.println("NDC X=["+minX+","+maxX+"], Y=["+minY+","+maxY+"]");
 
 			int vao = glGenVertexArrays(); glBindVertexArray(vao);
 			int vbo = glGenBuffers(); glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -436,21 +434,16 @@ public static void main(String[] args)
 			java.nio.file.Path outDir = java.nio.file.Paths.get("Results", file, renderType.path);
 			java.nio.file.Files.createDirectories(outDir);
 
-			// nombre de couches
 			int nSlices = (int)Math.floor((zMax - zMin) / step) + 1;
-			// padding pour noms 0000.png, 0001.png, ...
 			int pad = Integer.toString(Math.max(0, nSlices - 1)).length();
 
 			for (int k = 0; k < nSlices; ++k) {
 				zSlice = zMin + k * step;
 				if (zSlice > zMax + epsZ) break;
 
-				// Option : échantillonner au centre de la tranche
-				// zSlice = Math.min(zMax, zSlice + 0.5f * step);
-
 				dp.renderSlice(zSlice);
 
-				glBindFramebuffer(GL_READ_FRAMEBUFFER, dp.getFbo()); // voir remarque ci-dessous
+				glBindFramebuffer(GL_READ_FRAMEBUFFER, dp.getFbo()); 
 				glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 				glReadBuffer(GL_COLOR_ATTACHMENT0);
 				glBlitFramebuffer(
@@ -461,7 +454,7 @@ public static void main(String[] args)
 				GLFW.glfwSwapBuffers(win);
 				GLFW.glfwPollEvents();
 
-				glFinish(); // s'assurer que le GPU a terminé avant lecture
+				glFinish(); 
 
 				BufferedImage img = readColorTextureRGBA8(dp.getColorTexture(), width, height);
 				String name = String.format("tranche%0" + pad + "d.png", k);
