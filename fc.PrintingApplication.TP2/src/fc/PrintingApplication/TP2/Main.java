@@ -45,6 +45,8 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
 import org.lwjgl.system.*;
+import org.lwjgl.system.CallbackI.F;
+
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -94,10 +96,10 @@ import java.util.stream.Stream;
 	public static int height = 1500;	// image height
 	public static float buseDiameter = 0.4f;	// diamètre de la buse
 	public static float resolution = 0.05f;	// resolution
-	public static float k = 3f;		// augmenter / dimuner le offest
-	public static Object object = Object.CHEESE;	// object to choose
-	public static Render renderType = Render.BLENDING;	// afficher les chemins ou le depth peeling
-
+	public static float k = 1f;		// augmenter / dimuner le offest
+	public static Object object = Object.CUTEOCTO;	// object to choose
+	public static Render renderType = Render.CHEMIN;	// afficher les chemins ou le depth peeling
+	public static boolean fill = true;
 	public static float step = 0.2f;	// pas entre tranche
 
 
@@ -292,8 +294,9 @@ public static void main(String[] args)
 			
 			if(t.listContours.size() > 0)
 			{
-				//BufferedImage img = t.dessinerContoursImage(Main.width, Main.height, 20, Main.width/2, Main.height/2, 0);
-				BufferedImage img = t.dessinerContoursEtOffsetsImage(Main.width, Main.height, Main.resolution, Main.width/2, Main.height/2);
+				// BufferedImage img = t.dessinerContoursImage(Main.width, Main.height, 20, Main.width/2, Main.height/2, 0);
+				//BufferedImage img = t.dessinerContoursEtOffsetsImage(Main.width, Main.height, Main.resolution, Main.width/2, Main.height/2);
+				BufferedImage img = t.dessinerRempit(Main.width, Main.height, Main.resolution, Main.width/2, Main.height/2);
 				try 
 				{ 
 					java.nio.file.Path outDir = java.nio.file.Paths.get("Results", file, renderType.path);

@@ -2,6 +2,7 @@ package fc.PrintingApplication.TP2;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -10,9 +11,7 @@ import java.util.Map;
 import java.util.Set;
 
 import fc.Math.Vec2f;
-import fc.PrintingApplication.clipper2.core.Path64;
-import fc.PrintingApplication.clipper2.core.Paths64;
-import fc.PrintingApplication.clipper2.core.Point64;
+import fc.PrintingApplication.clipper2.Clipper;
 import fc.PrintingApplication.clipper2.offset.ClipperOffset;
 import fc.PrintingApplication.clipper2.offset.EndType;
 import fc.PrintingApplication.clipper2.offset.JoinType;
@@ -23,7 +22,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
-import fc.PrintingApplication.clipper2.offset.*;
+
+import fc.PrintingApplication.clipper2.core.*;        // Path64, Paths64, Point64, ClipType, FillRule, PathType
 
 enum Type
 {
@@ -51,11 +51,6 @@ class Contour {
 
     void determineOrientation()
     {
-        double area2 = 0;
-        for (int i=0, j=listPoints.size()-1; i<listPoints.size(); j=i++) {
-            Vec2f a = listPoints.get(j), b = listPoints.get(i);
-            area2 += (a.x * b.y - b.x * a.y);
-        }
         int sum = 0;
         for(int i = 0; i < listPoints.size() - 1; i++)      //(x2-x1)*(y2+y1)
         {
@@ -173,6 +168,58 @@ public ArrayList<Vec2f> DivideAndConquer(List<Vec2f> pts, float epsilon) {
     }
 }
 
+
+void recreateAretes()
+{
+    listAretes = new ArrayList<>();
+    for(int i = 0; i < listPoints.size(); i++)
+    {
+        Arete a = new Arete();
+        a.First = listPoints.get(i);
+        a.Second = listPoints.get((i+1) % listPoints.size());
+        listAretes.add(a);
+    }
+}
+
+public void remplit(Graphics2D g2d) 
+{
+    if(type == Type.HOLE) g2d.setColor(Color.BLACK);
+    if(type == Type.ISLAND) g2d.setColor(Color.WHITE);
+
+    ArrayList<Arete> aretes = new ArrayList<>(listAretes);
+
+    aretes.sort(Comparator.comparing(a -> a.First.y));	
+    float ymin = aretes.get(0).First.y;
+    float ymax = aretes.get(aretes.size() - 1).Second.y;
+
+
+    for(int y = (int)(ymin * 20); y < (int)(int)(ymax * 20); y++)
+    {
+        ArrayList<Arete> intersectlistArete = new ArrayList<>();
+        ArrayList<Intersection> intersections = new ArrayList<>();
+
+        for(int i = 0; i < aretes.size(); i++)
+        {
+            if(aretes.get(i).First.y * 20 > y) break;
+            
+            if(aretes.get(i).Second.y != aretes.get(i).First.y && aretes.get(i).Second.y * 20 > y) intersectlistArete.add(aretes.get(i));
+        }
+
+        for(int i = 0; i < intersectlistArete.size(); i++)
+        {
+            float pente = (intersectlistArete.get(i).Second.x - intersectlistArete.get(i).First.x) / (intersectlistArete.get(i).Second.y - intersectlistArete.get(i).First.y);
+            intersections.add(new Intersection(y, (int) (intersectlistArete.get(i).First.x * 20 + pente * (y - intersectlistArete.get(i).First.y * 20)),intersectlistArete.get(i)));
+        }
+        intersections.sort(Comparator.comparing(a -> a.xIntersect));
+
+        for (int i = 0; i < intersections.size(); i +=2)
+        {
+            g2d.drawLine((int)(intersections.get(i).xIntersect), y, (int)(intersections.get(i + 1).xIntersect), y);
+        } 
+
+    }
+}
+
 }
 
 
@@ -181,7 +228,9 @@ class Tranche
     ArrayList<Arete> listAretes = new ArrayList<>();
     ArrayList<Contour> listContours = new ArrayList<>();
     ArrayList<Path64> listPath = new ArrayList<>();
-    
+    Path64 perimetre;
+    ArrayList<Path64> listPerimetre = new ArrayList<>();
+
     public Tranche(ArrayList<Arete> l)
     {
         listAretes = l;
@@ -198,26 +247,15 @@ class Tranche
         
         for(Contour contour : listContours)
         {
+            // System.out.println("---------------");
+            // System.out.println(contour.listAretes.size());
+
             contour.listPoints = contour.DivideAndConquer(contour.listPoints, epsilon);
-
-            listAretes = new ArrayList<>();
-            if (contour.listPoints != null && contour.listPoints.size() >= 2) 
-            {
-                for (int i = 0; i < contour.listPoints.size(); i++) {
-                    Vec2f a = contour.listPoints.get(i);
-                    Vec2f b = contour.listPoints.get((i + 1) % contour.listPoints.size());
-                    Arete arete = new Arete();
-                    arete.First = a;
-                    arete.Second = b;
-                    listAretes.add(arete);
-                }
-            }
+            contour.recreateAretes();
+            // System.out.println(contour.listAretes.size());
         }
-        //reverseHole();
-        
-        
 
-        clip();
+        clip3();
 
     }
 
@@ -422,6 +460,131 @@ ArrayList<Path64> clip() {
     return listPath;
 }
 
+ArrayList<Path64> clip2() {
+
+    ClipperOffset offset = new ClipperOffset();
+
+    // 1) Construire les contours vectorisés (perimetre = premier path)
+    for (Contour contour : listContours) {
+        List<Vec2f> positions = contour.listPoints;
+        if (positions.size() < 2) continue;
+
+        Path64 path = new Path64(positions.size());
+        for (int i = 0; i < positions.size(); i++) {
+            long x = Main.width  / 2 + Math.round(positions.get(i).x / Main.resolution);
+            long y = Main.height / 2 + Math.round(positions.get(i).y / Main.resolution);
+            path.add(new Point64(x, y));
+        }
+
+        // garder le premier contour comme "périmètre principal"
+        if (perimetre == null) {
+            perimetre = path;
+        }
+
+        offset.AddPath(path, JoinType.Miter, EndType.Polygon);
+    }
+
+    offset.setMergeGroups(false);
+
+    // 2) Génération des coques (delta négatif = contraction vers l’intérieur)
+    double delta = -Main.k * (Main.buseDiameter / Main.resolution);
+
+    while (true) {
+        Paths64 solution = new Paths64();
+        offset.Execute(delta, solution);
+        if (solution.isEmpty()) break;
+
+        // Ajouter toutes les coques trouvées à listPath
+        listPath.addAll(solution);
+
+        // Préparer offset pour la coque suivante
+        offset.Clear();
+        offset.AddPaths(solution, JoinType.Miter, EndType.Polygon);
+    }
+
+    return listPath; // ne contient que les coques, pas le périmètre
+}
+
+
+ArrayList<Path64> clip3() {
+
+    // Réinit sorties
+    listPath = new ArrayList<>();
+    listPerimetre.clear();
+    perimetre = null; // laissé pour compatibilité si tu l'affiches ailleurs
+
+    // 1) Construire subject = toutes les boucles (îles + trous)
+    Paths64 subject = new Paths64();
+    for (Contour contour : listContours) {
+        List<Vec2f> pts = contour.listPoints;
+        if (pts == null || pts.size() < 2) continue;
+
+        Path64 path = new Path64(pts.size());
+        for (Vec2f v : pts) {
+            long x = Main.width  / 2 + Math.round(v.x / Main.resolution);
+            long y = Main.height / 2 + Math.round(v.y / Main.resolution);
+            path.add(new Point64(x, y));
+        }
+
+        // Orientations pour Clipper : îles = positive, trous = négative
+        boolean pos = Clipper.IsPositive(path);
+        if (contour.type == Type.ISLAND && !pos) Clipper.ReversePath(path);
+        if (contour.type == Type.HOLE   &&  pos) Clipper.ReversePath(path);
+
+        subject.add(path);
+    }
+
+    if (subject.isEmpty()) return listPath;
+
+    // (optionnel) mémoriser la plus grande île originale (héritage d'affichage)
+    long bestArea = Long.MIN_VALUE;
+    for (Path64 p : subject) {
+        if (Clipper.IsPositive(p)) {
+            long a = Math.abs(Math.round(Clipper.Area(p)));
+            if (a > bestArea) { bestArea = a; perimetre = p; }
+        }
+    }
+
+    // 2) 1er inset (épaisseur buse) -> périmètre = subject - inset1
+    double step = -Main.k * (Main.buseDiameter / Main.resolution);
+    if (step >= 0) step = -Math.abs(step);
+
+    Paths64 inset1 = new Paths64();
+    {
+        ClipperOffset co = new ClipperOffset();
+        co.AddPaths(subject, JoinType.Miter, EndType.Polygon);
+        co.Execute(step, inset1);
+    }
+
+    // Périmètre = 1er anneau de matière
+    if (!inset1.isEmpty()) {
+        Paths64 ring0 = Clipper.Difference(subject, inset1, FillRule.NonZero);
+        listPerimetre.addAll(ring0);
+    } else {
+        // Si pas d'espace pour un inset, on considère les contours originaux comme périmètre
+        listPerimetre.addAll(subject);
+        return listPath; // pas de coques possibles
+    }
+
+    // 3) Coques successives : anneaux internes
+    Paths64 current = inset1;
+    while (true) {
+        Paths64 next = new Paths64();
+        ClipperOffset co = new ClipperOffset();
+        co.AddPaths(current, JoinType.Miter, EndType.Polygon);
+        co.Execute(step, next);
+        if (next.isEmpty()) break;
+
+        Paths64 ring = Clipper.Difference(current, next, FillRule.NonZero);
+        listPath.addAll(ring);
+
+        current = next;
+    }
+
+    return listPath; // coques ; le 1er anneau (périmètre) est dans listPerimetre
+}
+
+
 public BufferedImage dessinerContoursImage(int width, int height, double pxPerUnit, int cx, int cy, int nb) {
         BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = img.createGraphics();
@@ -453,7 +616,7 @@ public BufferedImage dessinerContoursImage(int width, int height, double pxPerUn
             if (nb > listContours.get(i).listAretes.size()) nb = listContours.get(i).listAretes.size();
 
 
-            boolean usePoint = false;
+            boolean usePoint = true;
 
             if(!usePoint)
             {
@@ -491,6 +654,131 @@ public BufferedImage dessinerContoursImage(int width, int height, double pxPerUn
             }
 
         }
+        g2d.translate(-cx, -cy);
+        g2d.dispose();
+        return img;
+    }
+
+
+
+public BufferedImage dessinerRempit(int width, int height, double pxPerUnit, int cx, int cy) {
+        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2d = img.createGraphics();
+        // fond blanc
+        g2d.setColor(Color.BLACK);
+        g2d.fillRect(0, 0, width, height);
+
+        // rendu lisse et épaisseur
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2d.setStroke(new BasicStroke(2f));
+        // translation du repère
+        g2d.translate(cx, cy);
+        
+        g2d.setColor(Color.WHITE);
+        
+        //listAretes = new ArrayList<>();
+        // for(Contour contour : listContours) listAretes.addAll(contour.listAretes);
+
+        if(listAretes.size() < 2) return img;
+        listAretes.sort(Comparator.comparing(a -> a.First.y));	
+        float ymin = listAretes.get(0).First.y;
+        float ymax = listAretes.get(listAretes.size() - 1).Second.y;
+
+        if (Main.fill)
+        {
+            for(int y = (int)(ymin * 20); y < (int)(int)(ymax * 20); y++)
+            {
+                ArrayList<Arete> intersectlistArete = new ArrayList<>();
+                ArrayList<Intersection> intersections = new ArrayList<>();
+
+                for(int i = 0; i < listAretes.size(); i++)
+                {
+                    if(listAretes.get(i).First.y * 20 > y) break;
+                    
+                    if(listAretes.get(i).Second.y != listAretes.get(i).First.y && listAretes.get(i).Second.y * 20 > y) intersectlistArete.add(listAretes.get(i));
+                }
+
+                for(int i = 0; i < intersectlistArete.size(); i++)
+                {
+                    float pente = (intersectlistArete.get(i).Second.x - intersectlistArete.get(i).First.x) / (intersectlistArete.get(i).Second.y - intersectlistArete.get(i).First.y);
+                    intersections.add(new Intersection(y, (int) (intersectlistArete.get(i).First.x * 20 + pente * (y - intersectlistArete.get(i).First.y * 20)),intersectlistArete.get(i)));
+                }
+                intersections.sort(Comparator.comparing(a -> a.xIntersect));
+
+                for (int i = 0; i < intersections.size(); i +=2)
+                {
+                    if(i + 1 >= intersections.size()) break;
+                    g2d.drawLine((int)(intersections.get(i).xIntersect), y, (int)(intersections.get(i + 1).xIntersect), y);
+                } 
+
+            }
+        }
+        g2d.setColor(Color.RED);
+
+        /*if (perimetre.size() >= 2)
+        {
+        for (int i = 0; i < perimetre.size(); i++) {
+                Point64 a = perimetre.get(i);
+                Point64 b = perimetre.get((i + 1) % perimetre.size());
+
+                int x1 = (int)Math.round((a.x - cx));
+                int y1 = (int)Math.round((a.y - cy));
+                int x2 = (int)Math.round((b.x - cx));
+                int y2 = (int)Math.round((b.y - cy));
+
+                g2d.drawLine(x1, y1, x2, y2);
+            }
+        }*/
+
+
+        for(Path64 per : listPerimetre)
+        {
+            if (per.size() >= 2)
+            {
+                for (int i = 0; i < per.size(); i++) 
+                {
+                    Point64 a = per.get(i);
+                    Point64 b = per.get((i + 1) % per.size());
+
+                    int x1 = (int)Math.round((a.x - cx));
+                    int y1 = (int)Math.round((a.y - cy));
+                    int x2 = (int)Math.round((b.x - cx));
+                    int y2 = (int)Math.round((b.y - cy));
+
+                    g2d.drawLine(x1, y1, x2, y2);
+                }
+            }
+        }
+
+
+        g2d.setStroke(new BasicStroke(2.5f));
+            for (int k = 0; k < listPath.size(); k++) {
+                Path64 path = listPath.get(k);
+                if (path.size() < 2) continue;
+
+                g2d.setColor(Color.BLUE);
+
+                for (int i = 0; i < path.size(); i++) {
+                    Point64 a = path.get(i);
+                    Point64 b = path.get((i + 1) % path.size());
+
+                    int x1 = (int)Math.round((a.x - cx));
+                    int y1 = (int)Math.round((a.y - cy));
+                    int x2 = (int)Math.round((b.x - cx));
+                    int y2 = (int)Math.round((b.y - cy));
+
+                    g2d.drawLine(x1, y1, x2, y2);
+                }
+            }
+
+        /*listContours.sort(Comparator.comparing(contour -> contour.type));
+
+        for(Contour contour : listContours)
+        {
+            contour.remplit(g2d);
+        }*/
+
+
         g2d.translate(-cx, -cy);
         g2d.dispose();
         return img;
