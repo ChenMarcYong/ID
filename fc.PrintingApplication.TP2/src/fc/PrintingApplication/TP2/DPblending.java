@@ -7,8 +7,8 @@ import static org.lwjgl.opengl.GL30.*;
 
 class DPblend extends DPbase {
 
-    private int texCount = 0;     // R32F : accumule +1 par fragment sous la coupe
-    private int progComposeParity = 0; // shader de composition avec masque par parité
+    private int texCount = 0;     
+    private int progComposeParity = 0; 
 
     public DPblend(int width, int height, float zMinWorld, float zMaxWorld) {
         super(width, height, zMinWorld, zMaxWorld);
@@ -17,10 +17,8 @@ class DPblend extends DPbase {
     @Override
     public void initGL() {
         super.initGL();
-        // Texture compteur (R32F) pour accumulation par blending additif
         texCount = createFloatR32Texture(width, height);
 
-        // Compose avec lecture de la parité dans texCount
         final String FS_COMPOSE_PARITY =
             "#version 330 core\n" +
             "uniform sampler2D uTexZLower, uTexZUpper, uTexCount;\n" +
@@ -48,16 +46,13 @@ class DPblend extends DPbase {
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         attachAsColor(texCount);
 
-        // Pas de depth/cull/stencil ; on veut tout accumuler
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
         glDisable(GL_STENCIL_TEST);
 
-        // Compteur = 0 au départ
         glClearColor(0f, 0f, 0f, 0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // Blending additif : dest += src (src = 1.0 par fragment sous la coupe)
         glEnable(GL_BLEND);
         glBlendEquation(GL_FUNC_ADD);
         glBlendFunc(GL_ONE, GL_ONE);
@@ -65,7 +60,7 @@ class DPblend extends DPbase {
         glUseProgram(progMeshDiscardAbove);
         glUniform1f(glGetUniformLocation(progMeshDiscardAbove, "uZSlice"), z_s);
         glUniform1f(glGetUniformLocation(progMeshDiscardAbove, "uEps"),   epsZ);
-        glUniform1i(glGetUniformLocation(progMeshDiscardAbove, "uMode"),  3); // uMode=3 => écrit 1.0
+        glUniform1i(glGetUniformLocation(progMeshDiscardAbove, "uMode"),  3); 
 
         drawMesh();
 
@@ -81,10 +76,8 @@ class DPblend extends DPbase {
         glClearColor(0f, 0f, 0f, 1f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // Pas de stencil ici : le masque vient de la parité de texCount
         glUseProgram(progComposeParity);
 
-        // Uniforms communs (ZLower/ZUpper + params)
         glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texZLower);
         glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, texZUpper);
         glUniform1i(glGetUniformLocation(progComposeParity, "uTexZLower"), 0);
@@ -92,7 +85,6 @@ class DPblend extends DPbase {
         glUniform1f(glGetUniformLocation(progComposeParity, "uZSlice"), z_s);
         glUniform1f(glGetUniformLocation(progComposeParity, "uMaxDist"), maxDistColor);
 
-        // Masque par parité
         glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, texCount);
         glUniform1i(glGetUniformLocation(progComposeParity, "uTexCount"), 2);
 

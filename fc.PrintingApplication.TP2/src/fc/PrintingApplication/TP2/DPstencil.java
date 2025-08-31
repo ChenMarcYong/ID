@@ -15,18 +15,14 @@ class DPstencil extends DPbase {
     protected void passA_Count(float z_s) {
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
-        // On attache n'importe quelle cible couleur (on n'écrit pas dedans)
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0);
 
-        // Pas de depth/cull/blend pour compter TOUTES les faces sous la coupe
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
         glDisable(GL_BLEND);
 
-        // On n'écrit pas dans la couleur pendant le comptage
         glColorMask(false, false, false, false);
 
-        // Stencil : winding count (front ++, back --)
         glEnable(GL_STENCIL_TEST);
         glStencilMask(0xFF);
         glClearStencil(0);
@@ -35,7 +31,7 @@ class DPstencil extends DPbase {
         glUseProgram(progMeshDiscardAbove);
         glUniform1f(glGetUniformLocation(progMeshDiscardAbove, "uZSlice"), z_s);
         glUniform1f(glGetUniformLocation(progMeshDiscardAbove, "uEps"),   epsZ);
-        glUniform1i(glGetUniformLocation(progMeshDiscardAbove, "uMode"),  0); // fragments sous la coupe
+        glUniform1i(glGetUniformLocation(progMeshDiscardAbove, "uMode"),  0);
 
         glStencilFuncSeparate(GL_FRONT_AND_BACK, GL_ALWAYS, 0, 0xFF);
         glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_KEEP, GL_INCR_WRAP);
@@ -44,7 +40,6 @@ class DPstencil extends DPbase {
 
         drawMesh();
 
-        // Nettoyage
         glDisable(GL_STENCIL_TEST);
         glColorMask(true, true, true, true);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -58,7 +53,6 @@ class DPstencil extends DPbase {
         glClearColor(0f, 0f, 0f, 1f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // Masque intérieur via stencil != 0
         glEnable(GL_STENCIL_TEST);
         glStencilFunc(GL_NOTEQUAL, 0, 0xFF);
         glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);

@@ -235,7 +235,7 @@ class Tranche
     {
         listAretes = l;
 
-        findAllContours3();
+        findAllContours2();
 		JordanTheorem();
 
         
@@ -370,91 +370,6 @@ class Tranche
             listContours.add(new Contour(chain));
         }
     }
-
-
-
-void findAllContours3() {
-    listContours.clear();
-    if (listAretes == null || listAretes.isEmpty()) return;
-    class Key {
-        float x, y;
-        Key(Vec2f v) {
-            this.x = Math.round(v.x / Main.resolution);
-            this.y = Math.round(v.y / Main.resolution);
-        }
-        @Override public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof Key)) return false;
-            Key k = (Key) o; return x == k.x && y == k.y;
-        }
-        @Override public int hashCode() { return java.util.Objects.hash(x, y); }
-    }
-
-    Map<Key, ArrayList<Integer>> adj = new HashMap<>();
-    boolean[] used = new boolean[listAretes.size()];
-
-    for (int i = 0; i < listAretes.size(); i++) {
-        Arete e = listAretes.get(i);
-        if (e.First.equals(e.Second)) { used[i] = true; continue; }
-
-        Key kA = new Key(e.First);
-        Key kB = new Key(e.Second);
-
-        adj.computeIfAbsent(kA, key -> new ArrayList<>()).add(i); 
-        adj.computeIfAbsent(kB, key -> new ArrayList<>()).add(i);
-    }
-
-    for (int i = 0; i < listAretes.size(); i++) {
-        if (used[i]) continue;
-
-        Arete e0 = listAretes.get(i);
-        ArrayList<Arete> chain = new ArrayList<>();
-        used[i] = true;
-
-        Vec2f start = e0.First;
-        Vec2f cur   = e0.Second;
-        chain.add(new Arete(e0.First, e0.Second));
-
-        Key startK = new Key(start);
-        Key curK   = new Key(cur);
-
-        boolean closed = false;
-
-        while (true) {
-            ArrayList<Integer> bucket = adj.get(curK);
-            if (bucket == null) break;
-
-            int nextId = -1;
-            for (int id : bucket) {
-                if (!used[id]) { nextId = id; break; }
-            }
-            if (nextId == -1) break;
-
-            Arete en = listAretes.get(nextId);
-            used[nextId] = true;
-
-            if (new Key(en.First).equals(curK)) {
-                chain.add(new Arete(en.First, en.Second));
-                cur = en.Second;
-            } else if (new Key(en.Second).equals(curK)) {
-                chain.add(new Arete(en.Second, en.First));
-                cur = en.First;
-            } else {
-                float d1 = en.First.distanceSquared(cur);
-                float d2 = en.Second.distanceSquared(cur);
-                if (d1 <= d2) { chain.add(new Arete(en.First, en.Second)); cur = en.Second; }
-                else          { chain.add(new Arete(en.Second, en.First)); cur = en.First; }
-            }
-
-            curK = new Key(cur);
-            if (curK.equals(startK)) { closed = true; break; }
-        }
-
-        if (closed && chain.size() >= 3) {
-            listContours.add(new Contour(chain));
-        }
-    }
-}
 
 
 

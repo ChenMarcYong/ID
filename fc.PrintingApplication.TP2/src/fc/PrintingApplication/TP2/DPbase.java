@@ -1,6 +1,5 @@
 package fc.PrintingApplication.TP2;
 
-// --- OpenGL LWJGL ---
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.*;
 import static org.lwjgl.opengl.GL13.*;
@@ -8,35 +7,28 @@ import static org.lwjgl.opengl.GL14.*;
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.opengl.GL32.*;
-
-// --- Buffers utilitaires LWJGL ---
 import org.lwjgl.BufferUtils;
 
 import fc.PrintingApplication.TP2.Main.Render;
-
 import java.awt.font.NumericShaper.Range;
-// --- Java ---
 import java.nio.IntBuffer;
 
 abstract class DPbase {
 
-    // ---- Params communs ----
     protected final int width, height;
     protected final float zMinWorld, zMaxWorld;
     protected final float epsZ = 1e-6f;
     protected final float maxDistColor = 0.80f; // mm
 
-    // ---- Mesh ----
     protected int meshVao = 0;
     protected int meshIndexCount = 0;
     protected int meshMode = GL_TRIANGLES;
 
-    // ---- GL objects communs ----
     protected int fbo = 0;
-    protected int texZLower = 0;   // R32F
-    protected int texZUpper = 0;   // R32F
-    protected int colorTex = 0;    // RGBA8
-    protected int rboStencil = 0;  // STENCIL8 (utile pour la variante stencil)
+    protected int texZLower = 0; 
+    protected int texZUpper = 0; 
+    protected int colorTex = 0; 
+    protected int rboStencil = 0;
 
     protected int progMeshDiscardAbove = 0;
     protected int progCompose = 0;
@@ -53,20 +45,16 @@ abstract class DPbase {
         this.meshMode = mode;
     }
 
-    /** Initialisation GL commune aux deux variantes (stencil/blend). */
     public void initGL() {
-        // FBO + colorTex
         fbo = glGenFramebuffers();
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
         colorTex = createColorTexture(width, height);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0);
 
-        // ZLower/ZUpper (R32F)
         texZLower = createFloatR32Texture(width, height);
         texZUpper = createFloatR32Texture(width, height);
 
-        // Stencil RBO (présent même si la variante blend ne l’utilise pas en D)
         rboStencil = glGenRenderbuffers();
         glBindRenderbuffer(GL_RENDERBUFFER, rboStencil);
         glRenderbufferStorage(GL_RENDERBUFFER, GL_STENCIL_INDEX8, width, height);
@@ -75,23 +63,18 @@ abstract class DPbase {
         checkFboComplete();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        // Shaders communs
         progMeshDiscardAbove = compileProgram(VS_MESH, FS_MESH_DISCARD);
         progCompose          = compileProgram(VS_QUAD, FS_COMPOSE_COMMON);
 
-        // Fullscreen triangle
         vaoQuad = createFullScreenQuad();
     }
 
-    /** Pipeline commun : A (spécifique), B, C, D (spécifique). */
     public final void renderSlice(float z_s) {
-        passA_Count(z_s);  // défini dans sous-classes
-        passB_ZLower(z_s); // commun
-        passC_ZUpper(z_s); // commun
-        passD_Compose(z_s);// défini dans sous-classes
+        passA_Count(z_s);  
+        passB_ZLower(z_s); 
+        passC_ZUpper(z_s);
+        passD_Compose(z_s);
     }
-
-    // -------- Passes communes B/C + utilitaires pour D --------
 
     protected void passB_ZLower(float z_s) {
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -102,7 +85,7 @@ abstract class DPbase {
         glBlendEquation(GL_MAX);
         glBlendFunc(GL_ONE, GL_ONE);
 
-        useMeshProgram(z_s, epsZ, 1); // uMode=1 => z < z_s - eps
+        useMeshProgram(z_s, epsZ, 1); 
         drawMesh();
 
         glDisable(GL_BLEND);
@@ -118,14 +101,13 @@ abstract class DPbase {
         glBlendEquation(GL_MIN);
         glBlendFunc(GL_ONE, GL_ONE);
 
-        useMeshProgram(z_s, epsZ, 2); // uMode=2 => z > z_s + eps
+        useMeshProgram(z_s, epsZ, 2);
         drawMesh();
 
         glDisable(GL_BLEND);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    /** Renseigne les uniforms communs du composeur (ZLower/ZUpper, z_s, maxDist). */
     protected void composeCommonUniforms(float z_s) {
         glUseProgram(progCompose);
         glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texZLower);
@@ -136,11 +118,9 @@ abstract class DPbase {
         glUniform1f(glGetUniformLocation(progCompose, "uMaxDist"), maxDistColor);
     }
 
-    // --------- Méthodes abstraites à implémenter dans les sous-classes ---------
     protected abstract void passA_Count(float z_s);
     protected abstract void passD_Compose(float z_s);
 
-    // ---------------- Helpers GL (manquants dans tes erreurs) ----------------
 
     protected static int createColorTexture(int w, int h) {
         int tex = glGenTextures();
@@ -199,14 +179,12 @@ abstract class DPbase {
     }
 
     protected static int createFullScreenQuad() {
-        // Fullscreen triangle (pas de VBO : positions générées dans le VS)
         int vao = glGenVertexArrays();
         glBindVertexArray(vao);
         glBindVertexArray(0);
         return vao;
     }
 
-    // --- petits helpers utilisés dans le flux ---
     protected void attachAsColor(int tex) {
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
         IntBuffer buf = BufferUtils.createIntBuffer(1);
@@ -220,9 +198,6 @@ abstract class DPbase {
 
 
         glClear(GL_COLOR_BUFFER_BIT);
-
-        //if(Main.renderType == Render.STENCIL)glClear(GL_COLOR_BUFFER_BIT);
-        //if(Main.renderType == Render.BLENDING)glClear(GL_STENCIL_BUFFER_BIT);
 
         
     }
@@ -244,7 +219,6 @@ abstract class DPbase {
     public int getFbo() { return fbo; }
     public int getColorTexture() { return colorTex; }
 
-    // ----------------- Shaders communs -----------------
 
     protected static final String VS_MESH =
         "#version 330 core\n" +
